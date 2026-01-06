@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MovieShelf - Login</title>
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand">
+        <h1>MovieShelf<span class="dot">.</span></h1>
+      </div>
+      <p class="subtitle">Login untuk akses Web Service (JWT)</p>
+
+      <form id="formLogin" class="form">
+        <label>Username</label>
+        <input id="loginUsername" autocomplete="username" placeholder="admin / user1" />
+
+        <label>Password</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="admin123 / user123" />
+
+        <div class="actions">
+          <button class="btn primary" type="submit">Login</button>
+        </div>
+      </form>
+
+      <p id="msg" class="msg"></p>
+
+      <div class="below">
+        <span>Belum punya akun?</span>
+        <a class="link" href="/register.html">Register di sini</a>
+      </div>
+
+      <div class="small">
+        Demo admin: <code>admin</code> / <code>ADMIN_PASSWORD</code> dari <code>.env</code><br/>
+        Halaman movies: <code>/movies.html</code> (wajib token JWT).
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>

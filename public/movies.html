@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MovieShelf - Movies</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+
+<body>
+  <div class="topbar">
+    <div>
+      <b>MovieShelf</b> <span id="me" class="muted"></span>
+    </div>
+
+    <div class="actions">
+      <button id="btnSync" class="secondary">Admin: Sync Trending</button>
+      <a class="link" href="/watchlist.html">Watchlist</a>
+      <button id="btnLogout" class="danger">Logout</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Movies (dari SQLite via ORM)</h2>
+
+      <div class="row">
+        <input id="q" placeholder="Cari judul film..." />
+        <button id="btnSearch">Search</button>
+        <button id="btnReload" class="secondary">Reload</button>
+      </div>
+
+      <!-- NOTIF AREA: ini yang bikin kamu lihat “Sync sukses/gagal” -->
+      <p id="msg" class="msg"></p>
+
+      <div id="list" class="grid"></div>
+    </div>
+  </div>
+
+  <script src="/js/movies.js"></script>
+</body>
+</html>

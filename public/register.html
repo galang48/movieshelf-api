@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MovieShelf - Register</title>
+  <link rel="stylesheet" href="/css/auth.css" />
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <div class="brand">
+        <h1>MovieShelf<span class="dot">.</span></h1>
+      </div>
+      <p class="subtitle">Register akun baru (role: user)</p>
+
+      <form id="formRegister" class="form">
+        <label>Username baru</label>
+        <input id="regUsername" autocomplete="username" placeholder="contoh: user1" />
+
+        <label>Password baru</label>
+        <input id="regPassword" type="password" autocomplete="new-password" placeholder="contoh: user123" />
+
+        <label>Ulangi password</label>
+        <input id="regPassword2" type="password" autocomplete="new-password" placeholder="ulang sekali lagi" />
+
+        <div class="actions two">
+          <button class="btn primary" type="submit">Create Account</button>
+          <button id="btnFillDemo" class="btn secondary" type="button">Isi Contoh</button>
+        </div>
+      </form>
+
+      <p id="msg" class="msg"></p>
+
+      <div class="below">
+        <span>Sudah punya akun?</span>
+        <a class="link" href="/">Kembali ke Login</a>
+      </div>
+
+      <div class="small">
+        Setelah register sukses, kamu akan diarahkan ke halaman login.
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/register.js"></script>
+</body>
+</html>
