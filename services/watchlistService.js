@@ -1,30 +1,48 @@
 async function add(database, userId, tmdbId) {
-  if (!tmdbId) throw new Error('tmdbId wajib diisi');
+  const movie = await database.Movie.findOne({ where: { tmdbId } });
+  if (!movie) throw new Error('Movie tidak ditemukan');
 
-  const movie = await database.Movie.findOne({ where: { tmdbId: Number(tmdbId) } });
-  if (!movie) throw new Error('Movie belum ada di DB. Admin harus sync dulu.');
-
-  const [row] = await database.Watchlist.findOrCreate({
+  const exists = await database.Watchlist.findOne({
     where: { userId, movieId: movie.id },
-    defaults: { userId, movieId: movie.id }
+  });
+  if (exists) throw new Error('Movie sudah ada di watchlist');
+
+  await database.Watchlist.create({
+    userId,
+    movieId: movie.id,
   });
 
-  return row;
+  return { message: 'Berhasil ditambahkan' };
 }
 
 async function list(database, userId) {
-  return database.Watchlist.findAll({
+  const rows = await database.Watchlist.findAll({
     where: { userId },
-    include: [{ model: database.Movie }]
+    include: [
+      {
+        model: database.Movie,
+        as: 'movie',
+        attributes: ['tmdbId', 'title', 'posterPath', 'releaseDate'],
+      },
+    ],
   });
+
+  return rows.map((r) => ({
+    tmdbId: r.movie.tmdbId,
+    title: r.movie.title,
+    posterPath: r.movie.posterPath,
+    releaseDate: r.movie.releaseDate,
+  }));
 }
 
 async function remove(database, userId, tmdbId) {
-  const movie = await database.Movie.findOne({ where: { tmdbId: Number(tmdbId) } });
+  const movie = await database.Movie.findOne({ where: { tmdbId } });
   if (!movie) throw new Error('Movie tidak ditemukan');
 
-  const row = await database.Watchlist.findOne({ where: { userId, movieId: movie.id } });
-  if (!row) throw new Error('Item watchlist tidak ditemukan');
+  const row = await database.Watchlist.findOne({
+    where: { userId, movieId: movie.id },
+  });
+  if (!row) throw new Error('Data tidak ditemukan');
 
   await row.destroy();
   return { message: 'Berhasil dihapus' };

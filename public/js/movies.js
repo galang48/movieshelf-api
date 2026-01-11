@@ -1,15 +1,28 @@
 const API = "/api/v1";
 
+/* ================== AUTH & UTILS ================== */
 function getToken() {
   return localStorage.getItem("token");
+}
+
+function getRefreshToken() {
+  return localStorage.getItem("refreshToken");
 }
 
 function headers() {
   const token = getToken();
   return {
     "Authorization": `Bearer ${token}`,
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
+}
+
+async function safeJson(res) {
+  try { return await res.json(); } catch { return {}; }
+}
+
+function requireLogin() {
+  if (!getToken()) window.location.href = "/login.html";
 }
 
 function setMsg(text, ok = false) {
@@ -19,30 +32,55 @@ function setMsg(text, ok = false) {
   el.className = "msg " + (text ? (ok ? "ok" : "err") : "");
 }
 
-async function safeJson(res) {
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  const txt = await res.text();
-  return { success: false, error: txt || `HTTP ${res.status}` };
+/* ================== REFRESH TOKEN ================== */
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const json = await safeJson(res);
+    if (!json.success) return false;
+
+    localStorage.setItem("token", json.data.token);
+    localStorage.setItem("refreshToken", json.data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function posterUrl(posterPath) {
-  if (!posterPath) return "";
-  return `https://image.tmdb.org/t/p/w342${posterPath}`;
+async function fetchWithAuth(url, options = {}, retry = true) {
+  const opts = { ...options };
+  opts.headers = { ...headers(), ...(options.headers || {}) };
+
+  const res = await fetch(url, opts);
+
+  if (res.status === 401 && retry) {
+    const ok = await refreshAccessToken();
+    if (ok) return fetchWithAuth(url, options, false);
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    window.location.href = "/login.html";
+  }
+
+  return res;
 }
 
-function requireLogin() {
-  if (!getToken()) window.location.href = "/login.html";
-}
-
+/* ================== USER INFO ================== */
 async function loadMe() {
-  requireLogin();
-
-  const res = await fetch(`${API}/auth/me`, { headers: headers() });
+  const res = await fetchWithAuth(`${API}/auth/me`);
   const json = await safeJson(res);
 
   if (!json.success) {
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
     window.location.href = "/login.html";
     return;
   }
@@ -51,66 +89,88 @@ async function loadMe() {
   if (me) me.textContent = `(${json.data.username} - ${json.data.role})`;
 
   const btnSync = document.getElementById("btnSync");
-  if (btnSync && json.data.role !== "admin") btnSync.style.display = "none";
+  if (btnSync && json.data.role !== "admin") {
+    btnSync.style.display = "none";
+  }
 }
 
+/* ================== MOVIE CARD (MATCH CSS) ================== */
+function cardMovie(m) {
+  const card = document.createElement("div");
+  card.className = "movie";
+
+  const poster = document.createElement("div");
+  poster.className = "poster";
+  poster.style.backgroundImage = m.posterPath
+    ? `url(https://image.tmdb.org/t/p/w500${m.posterPath})`
+    : "url(https://placehold.co/500x750?text=No+Poster)";
+  card.appendChild(poster);
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = m.title || "-";
+  meta.appendChild(title);
+
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = `Release: ${m.releaseDate || "-"} | TMDB: ${m.tmdbId || "-"}`;
+  meta.appendChild(sub);
+
+  const btn = document.createElement("button");
+  btn.className = "secondary";
+  btn.textContent = "Add to Watchlist";
+  btn.onclick = async () => {
+    requireLogin();
+    try {
+      btn.disabled = true;
+      btn.textContent = "Adding...";
+
+      const r = await fetchWithAuth(`${API}/watchlist`, {
+        method: "POST",
+        body: JSON.stringify({ tmdbId: m.tmdbId }),
+      });
+
+      const j = await safeJson(r);
+      if (!j.success) return setMsg(j.error || "Gagal tambah watchlist");
+
+      setMsg("✅ Ditambahkan ke watchlist", true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add to Watchlist";
+    }
+  };
+
+  meta.appendChild(btn);
+  card.appendChild(meta);
+
+  return card;
+}
+
+/* ================== RENDER ================== */
 function render(list) {
   const el = document.getElementById("list");
   el.innerHTML = "";
 
-  (list || []).forEach(m => {
-    const card = document.createElement("div");
-    card.className = "movie";
+  if (!list || !list.length) {
+    el.innerHTML = `<p class="muted">Tidak ada data. Admin klik "Sync Trending" dulu.</p>`;
+    return;
+  }
 
-    const poster = document.createElement("div");
-    poster.className = "poster";
-    const p = posterUrl(m.posterPath);
-    if (p) poster.style.backgroundImage = `url("${p}")`;
-
-    const meta = document.createElement("div");
-    meta.className = "meta";
-
-    const title = document.createElement("div");
-    title.className = "title";
-    title.textContent = m.title || "-";
-
-    const sub = document.createElement("div");
-    sub.className = "sub";
-    sub.textContent = `TMDB ID: ${m.tmdbId}${m.releaseDate ? ` • ${m.releaseDate}` : ""}`;
-
-    const btn = document.createElement("button");
-    btn.className = "secondary";
-    btn.textContent = "Add to Watchlist";
-    btn.onclick = async () => {
-      setMsg("");
-      const r = await fetch(`${API}/watchlist`, {
-        method: "POST",
-        headers: headers(),
-        body: JSON.stringify({ tmdbId: m.tmdbId })
-      });
-      const j = await safeJson(r);
-      if (!j.success) return setMsg(j.error || "Gagal tambah watchlist", false);
-      setMsg("Berhasil ditambahkan ke watchlist", true);
-    };
-
-    meta.appendChild(title);
-    meta.appendChild(sub);
-    meta.appendChild(btn);
-
-    card.appendChild(poster);
-    card.appendChild(meta);
-    el.appendChild(card);
-  });
+  list.forEach((m) => el.appendChild(cardMovie(m)));
 }
 
+/* ================== LOAD & SEARCH ================== */
 async function loadMovies() {
   requireLogin();
   setMsg("");
 
-  const res = await fetch(`${API}/movies`, { headers: headers() });
+  const res = await fetchWithAuth(`${API}/movies`);
   const json = await safeJson(res);
 
-  if (!json.success) return setMsg(json.error || "Gagal load movies", false);
+  if (!json.success) return setMsg(json.error || "Gagal load movies");
   render(json.data || []);
 }
 
@@ -119,70 +179,65 @@ async function searchMovies() {
   setMsg("");
 
   const q = document.getElementById("q").value.trim();
-  if (!q) return loadMovies();
+  const url = q
+    ? `${API}/movies/search?q=${encodeURIComponent(q)}`
+    : `${API}/movies`;
 
-  // Jika backend ada endpoint search:
-  const res = await fetch(`${API}/movies/search?q=${encodeURIComponent(q)}`, { headers: headers() });
-
-  // Kalau endpoint search tidak ada, fallback filter client-side
-  if (!res.ok) {
-    const allRes = await fetch(`${API}/movies`, { headers: headers() });
-    const allJson = await safeJson(allRes);
-    if (!allJson.success) return setMsg(allJson.error || "Gagal search", false);
-
-    const items = (allJson.data || []).filter(m =>
-      (m.title || "").toLowerCase().includes(q.toLowerCase())
-    );
-    render(items);
-    return;
-  }
-
+  const res = await fetchWithAuth(url);
   const json = await safeJson(res);
-  if (!json.success) return setMsg(json.error || "Gagal search", false);
+
+  if (!json.success) return setMsg(json.error || "Gagal search");
   render(json.data || []);
 }
 
-document.getElementById("btnLogout").addEventListener("click", () => {
+/* ================== BUTTONS ================== */
+document.getElementById("btnLogout").onclick = async () => {
+  const rt = getRefreshToken();
   localStorage.removeItem("token");
+  localStorage.removeItem("refreshToken");
+
+  if (rt) {
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: rt }),
+      });
+    } catch {}
+  }
+
   window.location.href = "/login.html";
-});
+};
 
-document.getElementById("btnReload").addEventListener("click", loadMovies);
-document.getElementById("btnSearch").addEventListener("click", searchMovies);
+document.getElementById("btnReload").onclick = loadMovies;
+document.getElementById("btnSearch").onclick = searchMovies;
 
-document.getElementById("btnSync").addEventListener("click", async () => {
+document.getElementById("btnSync").onclick = async () => {
   requireLogin();
-
   const btn = document.getElementById("btnSync");
-  const oldText = btn.textContent;
+  const old = btn.textContent;
 
   try {
     btn.disabled = true;
     btn.textContent = "Syncing...";
-    setMsg("Sync trending... tunggu sebentar", true);
+    setMsg("Sync trending...", true);
 
-    const res = await fetch(`${API}/admin/sync/trending`, {
+    const res = await fetchWithAuth(`${API}/admin/sync/trending`, {
       method: "POST",
-      headers: headers()
     });
 
     const json = await safeJson(res);
+    if (!json.success) return setMsg(json.error || "Sync gagal");
 
-    if (!json.success) {
-      return setMsg(json.error || "Sync gagal", false);
-    }
-
-    const count = json.data?.count ?? json.data?.inserted ?? json.data?.synced ?? 0;
-    setMsg(`Sync sukses: ${count} film tersimpan/terupdate`, true);
-
+    const count = json.data?.count ?? 0;
+    setMsg(`✅ Sync sukses. ${count} movie tersimpan/terupdate.`, true);
     await loadMovies();
-  } catch (e) {
-    setMsg(e.message || "Sync error", false);
   } finally {
     btn.disabled = false;
-    btn.textContent = oldText;
+    btn.textContent = old;
   }
-});
+};
 
+/* ================== INIT ================== */
 loadMe();
 loadMovies();

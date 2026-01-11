@@ -1,99 +1,170 @@
 const API = "/api/v1";
-const token = localStorage.getItem("token");
-if (!token) window.location.href = "/login.html";
+
+/* ================== AUTH & UTILS ================== */
+function getToken() {
+  return localStorage.getItem("token");
+}
+
+function getRefreshToken() {
+  return localStorage.getItem("refreshToken");
+}
 
 function headers() {
-  return { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" };
+  return {
+    "Authorization": `Bearer ${getToken()}`,
+    "Content-Type": "application/json",
+  };
+}
+
+async function safeJson(res) {
+  try { return await res.json(); } catch { return {}; }
+}
+
+function requireLogin() {
+  if (!getToken()) window.location.href = "/login.html";
 }
 
 function setMsg(text, ok = false) {
   const el = document.getElementById("msg");
+  if (!el) return;
   el.textContent = text || "";
-  el.className = "msg " + (ok ? "ok" : "err");
+  el.className = "msg " + (text ? (ok ? "ok" : "err") : "");
 }
 
-async function safeJson(res) {
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  const txt = await res.text();
-  return { success: false, error: txt || `HTTP ${res.status}` };
+/* ================== REFRESH TOKEN (SAMA KAYA MOVIES) ================== */
+async function refreshAccessToken() {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  try {
+    const res = await fetch(`${API}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    const json = await safeJson(res);
+    if (!json.success) return false;
+
+    localStorage.setItem("token", json.data.token);
+    localStorage.setItem("refreshToken", json.data.refreshToken);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function posterUrl(posterPath) {
-  if (!posterPath) return "";
-  return `https://image.tmdb.org/t/p/w342${posterPath}`;
+async function fetchWithAuth(url, options = {}, retry = true) {
+  const opts = { ...options };
+  opts.headers = { ...headers(), ...(options.headers || {}) };
+
+  const res = await fetch(url, opts);
+
+  if (res.status === 401 && retry) {
+    const ok = await refreshAccessToken();
+    if (ok) return fetchWithAuth(url, options, false);
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    window.location.href = "/login.html";
+  }
+
+  return res;
 }
 
-function render(items) {
-  const el = document.getElementById("list");
-  el.innerHTML = "";
+/* ================== CARD WATCHLIST (MATCH CSS) ================== */
+function cardMovie(m) {
+  const card = document.createElement("div");
+  card.className = "movie";
 
-  (items || []).forEach(w => {
-    const m = w.Movie;
+  const poster = document.createElement("div");
+  poster.className = "poster";
+  poster.style.backgroundImage = m.posterPath
+    ? `url(https://image.tmdb.org/t/p/w500${m.posterPath})`
+    : "url(https://placehold.co/500x750?text=No+Poster)";
+  card.appendChild(poster);
 
-    const card = document.createElement("div");
-    card.className = "movie";
+  const meta = document.createElement("div");
+  meta.className = "meta";
 
-    const poster = document.createElement("div");
-    poster.className = "poster";
-    const p = posterUrl(m?.posterPath);
-    if (p) poster.style.backgroundImage = `url("${p}")`;
+  const title = document.createElement("div");
+  title.className = "title";
+  title.textContent = m.title || "-";
+  meta.appendChild(title);
 
-    const meta = document.createElement("div");
-    meta.className = "meta";
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = `TMDB ID: ${m.tmdbId || "-"}`;
+  meta.appendChild(sub);
 
-    const title = document.createElement("div");
-    title.className = "title";
-    title.textContent = m?.title || "-";
+  const btn = document.createElement("button");
+  btn.className = "danger";
+  btn.textContent = "Remove";
+  btn.onclick = async () => {
+    requireLogin();
+    try {
+      btn.disabled = true;
 
-    const sub = document.createElement("div");
-    sub.className = "sub";
-    sub.textContent = `TMDB ID: ${m?.tmdbId || "-"}`;
+      const res = await fetchWithAuth(`${API}/watchlist/${m.tmdbId}`, {
+        method: "DELETE",
+      });
 
-    const btn = document.createElement("button");
-    btn.className = "danger";
-    btn.textContent = "Remove";
-    btn.onclick = async () => {
-      if (!m?.tmdbId) return;
-
-      setMsg("");
-      const res = await fetch(`${API}/watchlist/${m.tmdbId}`, { method: "DELETE", headers: headers() });
       const json = await safeJson(res);
-
       if (!json.success) {
-        // kalau backend belum punya endpoint delete, tampilkan pesan jelas
-        return setMsg(
-          "Gagal remove. Pastikan backend punya endpoint DELETE /api/v1/watchlist/:tmdbId",
-          false
-        );
+        setMsg(json.error || "Gagal hapus", false);
+        return;
       }
 
-      setMsg("Berhasil dihapus dari watchlist", true);
+      setMsg("✅ Dihapus dari watchlist", true);
       load();
-    };
+    } finally {
+      btn.disabled = false;
+    }
+  };
 
-    meta.appendChild(title);
-    meta.appendChild(sub);
-    meta.appendChild(btn);
+  meta.appendChild(btn);
+  card.appendChild(meta);
 
-    card.appendChild(poster);
-    card.appendChild(meta);
-
-    el.appendChild(card);
-  });
+  return card;
 }
 
+/* ================== LOAD WATCHLIST ================== */
 async function load() {
+  requireLogin();
   setMsg("");
-  const res = await fetch(`${API}/watchlist`, { headers: headers() });
+
+  const res = await fetchWithAuth(`${API}/watchlist`);
   const json = await safeJson(res);
-  if (!json.success) return setMsg(json.error || "Gagal load watchlist");
-  render(json.data || []);
+
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  if (!json.success || !json.data.length) {
+    list.innerHTML = `<p class="muted">Watchlist kosong.</p>`;
+    return;
+  }
+
+  json.data.forEach((m) => list.appendChild(cardMovie(m)));
 }
 
-document.getElementById("btnLogout").addEventListener("click", () => {
+/* ================== LOGOUT ================== */
+document.getElementById("btnLogout").onclick = async () => {
+  const rt = getRefreshToken();
   localStorage.removeItem("token");
-  window.location.href = "/login.html";
-});
+  localStorage.removeItem("refreshToken");
 
+  if (rt) {
+    try {
+      await fetch(`${API}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken: rt }),
+      });
+    } catch {}
+  }
+
+  window.location.href = "/login.html";
+};
+
+/* ================== INIT ================== */
 load();

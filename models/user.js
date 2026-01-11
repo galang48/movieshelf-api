@@ -10,6 +10,7 @@ module.exports = (sequelize, DataTypes) => {
 
   User.associate = (models) => {
     User.hasMany(models.Watchlist, { foreignKey: 'userId', as: 'watchlists' });
+    User.hasMany(models.RefreshToken, { foreignKey: 'userId', as: 'refreshTokens' });
   };
 
   return User;

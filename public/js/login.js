@@ -18,19 +18,16 @@ function must(v, name) {
 }
 
 async function safeJson(res) {
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  const txt = await res.text();
-  return { success: false, error: txt || `HTTP ${res.status}` };
+  try { return await res.json(); } catch { return {}; }
 }
 
 formLogin.addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    setMsg("");
-
     const username = must(loginUsername.value, "Username");
     const password = must(loginPassword.value, "Password");
+
+    setMsg("Login...", true);
 
     const res = await fetch(`${API}/auth/login`, {
       method: "POST",
@@ -43,6 +40,7 @@ formLogin.addEventListener("submit", async (e) => {
     if (!json.success) return setMsg(json.error || "Login gagal", false);
 
     localStorage.setItem("token", json.data.token);
+    if (json.data.refreshToken) localStorage.setItem("refreshToken", json.data.refreshToken);
     setMsg("Login sukses. Redirect...", true);
     window.location.href = "/movies.html";
   } catch (err) {

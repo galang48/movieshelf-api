@@ -21,6 +21,7 @@ db.Sequelize = Sequelize;
 db.User = require('./user')(sequelize, DataTypes);
 db.Movie = require('./movie')(sequelize, DataTypes);
 db.Watchlist = require('./watchlist')(sequelize, DataTypes);
+db.RefreshToken = require('./refreshToken')(sequelize, DataTypes);
 
 // associations
 Object.keys(db).forEach((key) => {

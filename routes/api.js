@@ -11,6 +11,11 @@ const requireRole = require('../middlewares/requireRole');
 
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+
+// refresh/logout TIDAK pakai authJwt, supaya bisa dipakai saat access token expired
+router.post('/auth/refresh', authController.refresh);
+router.post('/auth/logout', authController.logout);
+
 router.get('/auth/me', authJwt, authController.me);
 
 router.get('/movies', authJwt, movieController.getAll);
