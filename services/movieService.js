@@ -1,8 +1,8 @@
 const { Op } = require('sequelize');
 const tmdb = require('./tmdbService');
 
-async function syncTrending(database) {
-  const data = await tmdb.getTrendingMovies();
+async function syncTrending(database, options = {}) {
+  const data = await tmdb.getTrendingMovies(options);
   const items = data.results || [];
 
   for (const m of items) {

@@ -41,6 +41,7 @@ formLogin.addEventListener("submit", async (e) => {
 
     localStorage.setItem("token", json.data.token);
     if (json.data.refreshToken) localStorage.setItem("refreshToken", json.data.refreshToken);
+    if (json.data.apiKey) localStorage.setItem("apiKey", json.data.apiKey);
     setMsg("Login sukses. Redirect...", true);
     window.location.href = "/movies.html";
   } catch (err) {

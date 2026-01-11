@@ -67,7 +67,22 @@ async function login(database, { username, password }) {
   const token = signAccessToken(user);
   const refreshToken = await createRefreshToken(database, user.id);
 
-  return { token, refreshToken };
+  // Generate API Key if not exists
+  let apiKey = user.apiKey;
+  if (!apiKey) {
+    apiKey = crypto.randomBytes(32).toString('hex');
+    user.apiKey = apiKey;
+    try {
+      await user.save();
+    } catch (saveErr) {
+      console.error('FAILED TO SAVE API KEY:', saveErr);
+      // continue without saving to see if that's the issue, or rethrow?
+      // rethrow to see stack
+      throw new Error('Failed to save API KEY: ' + saveErr.message);
+    }
+  }
+
+  return { token, refreshToken, apiKey };
 }
 
 async function refresh(database, { refreshToken }) {

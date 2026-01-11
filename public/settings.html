@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MovieShelf - Settings</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div><b>Settings</b> <span id="me" class="muted"></span></div>
+    <div class="actions">
+      <a class="link" href="/movies.html">Movies</a>
+      <a class="link" href="/watchlist.html">Watchlist</a>
+      <button id="btnLogout" class="danger">Logout</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>Your API Key</h2>
+      <p class="muted">
+        Gunakan API Key ini untuk mengakses Movieshelf API tanpa login (header <code>x-api-key</code>).
+      </p>
+      <div id="userApiKeyBox" class="box-code" style="background:#333; padding:10px; margin-bottom:20px; word-break:break-all;">Loading...</div>
+    </div>
+
+    <div class="card">
+      <h2>TMDB API Key</h2>
+      <p class="muted">
+        Masukkan TMDB API Key milik Anda. Jika diisi, tombol <b>Admin: Sync Trending</b> akan memakai key ini.
+        Jika kosong, sistem memakai key dari <code>.env</code>.
+      </p>
+
+      <p id="status" class="muted"></p>
+
+      <label for="tmdbApiKey">TMDB API Key</label>
+      <input id="tmdbApiKey" placeholder="paste TMDB API key di sini..." />
+
+      <div class="row">
+        <button id="btnSave">Save</button>
+        <button id="btnClear" class="secondary">Clear</button>
+      </div>
+
+      <p id="msg" class="msg"></p>
+    </div>
+  </div>
+
+  <script src="/js/settings.js"></script>
+</body>
+</html>

@@ -38,7 +38,23 @@ async function logout(req, res) {
 }
 
 async function me(req, res) {
-  res.json({ success: true, data: req.user });
+  try {
+    const user = await db.User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+
+    res.json({
+      success: true,
+      data: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        apiKey: user.apiKey, // Include API Key
+        tmdbApiKey: user.tmdbApiKey
+      }
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 }
 
 module.exports = { register, login, refresh, logout, me };
